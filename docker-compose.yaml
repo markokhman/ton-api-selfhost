@@ -1,0 +1,57 @@
+version: "3.7"
+
+networks:
+  default:
+    external:
+      name: proxy
+
+services:
+  ton_api_v4:
+    image: tonwhales/ton-api-v4:v37
+    ports:
+      - 3000:3000
+    environment:
+      - TON_CONFIG=https://ton-blockchain.github.io/testnet-global.config.json
+    restart: unless-stopped
+  ton_http_api:
+    image: toncenter/ton-http-api
+    build:
+      context: ton-http-api
+      dockerfile: .docker/Dockerfile
+    environment:
+      - TON_API_CACHE_ENABLED
+      - TON_API_CACHE_REDIS_ENDPOINT
+      - TON_API_CACHE_REDIS_PORT
+      - TON_API_CACHE_REDIS_TIMEOUT
+      - TON_API_LOGS_JSONIFY
+      - TON_API_LOGS_LEVEL
+      - TON_API_TONLIB_LITESERVER_CONFIG=/run/secrets/liteserver_config
+      - TON_API_TONLIB_KEYSTORE
+      - TON_API_TONLIB_PARALLEL_REQUESTS_PER_LITESERVER
+      - TON_API_TONLIB_CDLL_PATH
+      - TON_API_TONLIB_REQUEST_TIMEOUT
+      - TON_API_GET_METHODS_ENABLED
+      - TON_API_JSON_RPC_ENABLED
+      - TON_API_ROOT_PATH
+    restart: unless-stopped
+    secrets:
+      - liteserver_config
+    command: -c "gunicorn -k uvicorn.workers.UvicornWorker -w ${TON_API_WEBSERVERS_WORKERS} --bind 0.0.0.0:8081 ${TON_API_GUNICORN_FLAGS} pyTON.main:app"
+    healthcheck:
+      test: curl -sS http://127.0.0.1:8081${TON_API_ROOT_PATH}/healthcheck || echo 1
+      interval: 15s
+      timeout: 3s
+      retries: 12
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx_config.conf:/etc/nginx/conf.d/default.conf
+    environment:
+      VIRTUAL_HOST: *SERVER DOMAIN*
+      LETSENCRYPT_HOST: *SERVER DOMAIN*
+      LETSENCRYPT_EMAIL: *EMAIL*
+      VIRTUAL_PORT: 8080
+    restart: unless-stopped
+secrets:
+  liteserver_config:
+    file: ${TON_API_TONLIB_LITESERVER_CONFIG:-./private/mainnet.json}
