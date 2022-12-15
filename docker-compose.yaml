@@ -8,8 +8,6 @@ networks:
 services:
   ton_api_v4:
     image: tonwhales/ton-api-v4:v37
-    ports:
-      - 3000:3000
     environment:
       - TON_CONFIG=https://ton-blockchain.github.io/testnet-global.config.json
     restart: unless-stopped
